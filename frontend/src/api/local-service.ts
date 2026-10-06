@@ -61,18 +61,32 @@ export function resetModule(key: string): PageResult {
   return listEntries(key)
 }
 
-export function exportEntries(key: string): { filename: string; content: string } {
+// CSV 单元格转义：含逗号、引号、换行的字段要包引号并双写引号，
+// 否则导出后列会错位（水位标高、流速就是被时段里的逗号顶掉的）。
+function csvCell(value: unknown): string {
+  const text = String(value ?? '')
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+export function exportEntries(
+  key: string,
+  filters: Record<string, string> = {},
+): { filename: string; content: string } {
   const meta = moduleMeta(key)
+  // 只导出当前过滤范围，保证下载件条数与页面清单一致。
+  const matched = filterRows(listRows(key), filters)
   const header = ['编号', ...meta.fields, '当前状态']
-  const lines = [header.join(',')]
-  for (const row of listRows(key)) {
-    lines.push([row.id, ...meta.fields.map((field) => row[field] ?? ''), row.status].join(','))
+  const lines = [header.map(csvCell).join(',')]
+  for (const row of matched) {
+    lines.push(
+      [row.id, ...meta.fields.map((field) => row[field] ?? ''), row.status].map(csvCell).join(','),
+    )
   }
   return { filename: `${meta.name}-清单.csv`, content: `\uFEFF${lines.join('\n')}` }
 }
 
-export function downloadEntries(key: string): void {
-  const { filename, content } = exportEntries(key)
+export function downloadEntries(key: string, filters: Record<string, string> = {}): void {
+  const { filename, content } = exportEntries(key, filters)
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')

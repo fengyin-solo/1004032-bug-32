@@ -68,4 +68,7 @@ npm run build
 - 字段、状态、动作与流转目标集中在 `frontend/src/data/modules.ts`；示例数据在
   `frontend/src/data/seed.ts`。
 - 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
+- 流量监测支持 CSV 数据文件上传（`frontend/src/api/flow-upload.ts`）：上传前校验测点编号、
+  监测时段与指标范围；同一「监测点编号 + 监测时段」只更新已有记录且保留原在线状态；
+  分批落盘，中断后可从剩余条目继续。导出清单按页面当前过滤条件生成，条数与列表一致。
 - 想回到初始数据：清掉浏览器里 `underground-pipeline-inspection:entries` 这一项，或调用 `resetModule(模块)`。

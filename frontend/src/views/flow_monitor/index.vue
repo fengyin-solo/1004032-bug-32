@@ -7,7 +7,9 @@
       </div>
       <div class="page-actions">
         <button class="btn primary" type="button" @click="openCreate">登记流量监测点</button>
+        <button class="btn" type="button" :disabled="uploading" @click="triggerUpload">上传数据文件</button>
         <button class="btn" type="button" @click="exportRows">导出流量监测清单</button>
+        <input ref="fileInput" type="file" accept=".csv,text/csv" hidden @change="onFileChange" />
       </div>
     </header>
 
@@ -23,6 +25,30 @@
         {{ item.status }}：{{ item.count }}
       </span>
     </p>
+
+    <div v-if="uploading || uploadMessage || failures.length" class="upload-panel">
+      <p v-if="uploading" class="upload-progress">
+        <span>正在上传 {{ uploadDone }}/{{ uploadTotal }} 条…</span>
+        <button class="link" type="button" @click="abortUpload">中断上传</button>
+      </p>
+      <p v-if="uploadMessage" class="upload-message">{{ uploadMessage }}</p>
+      <button
+        v-if="!uploading && remainingRows.length"
+        class="btn"
+        type="button"
+        @click="resumeUpload"
+      >
+        从失败项继续（剩余 {{ remainingRows.length }} 条）
+      </button>
+      <details v-if="failures.length" class="upload-failures">
+        <summary>{{ failures.length }} 行未通过校验，未入库</summary>
+        <ul>
+          <li v-for="failure in failures" :key="failure.line">
+            第 {{ failure.line }} 行：{{ failure.reason }}
+          </li>
+        </ul>
+      </details>
+    </div>
 
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
@@ -73,6 +99,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import { importValidRows, parseFlowFile } from '@/api/flow-upload'
+import type { ImportOutcome, RowFailure, ValidRow } from '@/api/flow-upload'
 import {
   downloadEntries,
   listEntries,
@@ -85,19 +113,39 @@ const meta = moduleMeta('flow_monitor')
 const columns = ["监测点编号", "监测点位", "监测时段", "瞬时流量", "累计流量", "水位标高", "流速", "数据状态"]
 const actions = ["标记异常", "恢复在线", "申请校准"]
 const statuses = ["在线", "离线", "数据异常", "已校准"]
-const stats = [{"label": "在线测点", "value": 0}, {"label": "离线测点", "value": 0}, {"label": "异常测点", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+
+function countStatus(status: string): number {
+  return rows.value.filter((row) => String(row.status) === status).length
+}
+
+// 统计卡片跟着列表数据走，避免看板与清单对不上。
+const stats = computed(() => [
+  { label: '在线测点', value: countStatus('在线') },
+  { label: '离线测点', value: countStatus('离线') },
+  { label: '异常测点', value: countStatus('数据异常') },
+])
+
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
-    count: rows.value.filter((row) => String(row.status) === status).length,
+    count: countStatus(status),
   })),
 )
+
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
+const uploadDone = ref(0)
+const uploadTotal = ref(0)
+const uploadMessage = ref('')
+const failures = ref<RowFailure[]>([])
+const remainingRows = ref<ValidRow[]>([])
+let abortRequested = false
 
 function resetFilters() {
   filters.value = {}
@@ -105,11 +153,90 @@ function resetFilters() {
 }
 
 function exportRows() {
-  downloadEntries(meta.key)
+  // 带上当前过滤条件，下载件条数与页面清单一致。
+  downloadEntries(meta.key, filters.value)
 }
 
 function openCreate() {
   errorMessage.value = '流量监测点登记入口尚未接入审批流'
+}
+
+function triggerUpload() {
+  if (uploading.value) {
+    return
+  }
+  fileInput.value?.click()
+}
+
+async function onFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  // 清空选择，允许再次选择同一文件（重复文件只会更新已有记录）。
+  input.value = ''
+  if (!file) {
+    return
+  }
+  uploadMessage.value = ''
+  failures.value = []
+  remainingRows.value = []
+  let text = ''
+  try {
+    text = await file.text()
+  } catch {
+    uploadMessage.value = '文件读取失败，请重新选择'
+    return
+  }
+  const parsed = parseFlowFile(text)
+  if (parsed.headerError) {
+    uploadMessage.value = `上传失败：${parsed.headerError}`
+    return
+  }
+  failures.value = parsed.failures
+  if (parsed.valid.length === 0) {
+    uploadMessage.value = parsed.failures.length
+      ? `没有可导入的有效条目，${parsed.failures.length} 行未通过校验`
+      : '文件里没有数据行'
+    return
+  }
+  await runImport(parsed.valid)
+}
+
+async function runImport(queue: ValidRow[]) {
+  uploading.value = true
+  abortRequested = false
+  uploadDone.value = 0
+  uploadTotal.value = queue.length
+  const outcome = await importValidRows(
+    queue,
+    (done, totalCount) => {
+      uploadDone.value = done
+      uploadTotal.value = totalCount
+    },
+    () => abortRequested,
+  )
+  uploading.value = false
+  remainingRows.value = outcome.remaining
+  uploadMessage.value = describeOutcome(outcome)
+  reload()
+}
+
+function describeOutcome(outcome: ImportOutcome): string {
+  const summary = `新增 ${outcome.created} 条，更新 ${outcome.updated} 条`
+  if (outcome.finished) {
+    return `上传完成：${summary}`
+  }
+  return `上传已中断：已完成 ${outcome.done}/${outcome.total} 条（${summary}），剩余 ${outcome.remaining.length} 条可从失败项继续`
+}
+
+function abortUpload() {
+  abortRequested = true
+}
+
+async function resumeUpload() {
+  if (uploading.value || remainingRows.value.length === 0) {
+    return
+  }
+  await runImport(remainingRows.value)
 }
 
 function runAction(action: string, row: EntryRow) {
