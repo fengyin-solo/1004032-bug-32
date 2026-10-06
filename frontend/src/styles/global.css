@@ -35,3 +35,47 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .error-text { color: #b42318; }
 .status-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; font-size: 12px; color: var(--muted); }
 .legend-item { background: #eef2f7; border-radius: 999px; padding: 2px 10px; }
+.page-actions { display: flex; gap: 8px; }
+.danger-link { color: #b42318; }
+
+.resume-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; }
+
+.modal-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 20; padding: 24px; }
+.modal { background: #fff; border-radius: 10px; width: 560px; max-width: 100%; max-height: 90vh; overflow-y: auto; padding: 18px 20px; }
+.modal-wide { width: 760px; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.modal-head h3 { margin: 0; font-size: 16px; }
+.modal-foot { display: flex; gap: 8px; margin-top: 14px; }
+
+.detail-status { border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; background: #eef2f7; }
+.detail-status.status-在线 { background: #ecfdf3; color: #027a48; }
+.detail-status.status-离线 { background: #f2f4f7; color: #475467; }
+.detail-status.status-数据异常 { background: #fef3f2; color: #b42318; }
+.detail-status.status-已校准 { background: #eff8ff; color: #175cd3; }
+.detail-flag { margin-left: 8px; background: #fee4e2; border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+.detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin: 0; font-size: 13px; }
+.detail-grid dt { color: var(--muted); }
+.detail-grid dd { margin: 0; }
+
+.import-tip { font-size: 13px; color: var(--muted); line-height: 1.7; margin: 0 0 10px; }
+.range-list { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 14px; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.file-label { position: relative; display: inline-block; }
+.file-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.import-error { margin-top: 12px; white-space: pre-line; }
+.import-progress { font-size: 13px; }
+.fix-panel { border: 1px solid #fda29b; background: #fffbfa; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 12px; margin: 10px 0; }
+.form-item span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.form-item input { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+.done-panel { background: #ecfdf3; border: 1px solid #6ce9a6; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.import-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+.import-list li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; border-bottom: 1px solid #eef2f7; }
+.import-list li:last-child { border-bottom: none; }
+.state-tag { border-radius: 999px; padding: 1px 8px; background: #eef2f7; color: var(--muted); }
+.row-state-committed .state-tag { background: #ecfdf3; color: #027a48; }
+.row-state-failed .state-tag { background: #fef3f2; color: #b42318; }
+.row-state-skipped .state-tag { background: #f2f4f7; }
+.action-tag { background: #eff8ff; color: #175cd3; border-radius: 999px; padding: 1px 8px; }
+.row-error { margin-left: auto; text-align: right; }
+
+.filter-item input[type="date"] { min-width: 150px; }

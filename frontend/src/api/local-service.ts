@@ -1,5 +1,6 @@
 import { MODULE_BY_KEY } from '@/data/modules'
 import { allRows, listRows, resetRows, saveRows } from '@/data/local-store'
+import { stringifyCsv } from '@/data/csv'
 import type { ActionResult, EntryRow, ModuleMeta, OverviewResult, PageResult } from '@/data/types'
 
 // 会写进数据的「往回走」动作：命中就把这条记录标成异常态，看板上能一眼看出来。
@@ -61,18 +62,44 @@ export function resetModule(key: string): PageResult {
   return listEntries(key)
 }
 
-export function exportEntries(key: string): { filename: string; content: string } {
+/** 把任意行集合按指定列导出：调用方给什么范围，文件里就是什么范围。 */
+export function exportRows(
+  key: string,
+  rows: EntryRow[],
+  columns: string[],
+  filenameSuffix = '',
+): { filename: string; content: string } {
   const meta = moduleMeta(key)
-  const header = ['编号', ...meta.fields, '当前状态']
-  const lines = [header.join(',')]
-  for (const row of listRows(key)) {
-    lines.push([row.id, ...meta.fields.map((field) => row[field] ?? ''), row.status].join(','))
+  const headers = ['编号', ...columns, '当前状态']
+  const records = rows.map((row) => {
+    const record: Record<string, unknown> = { 编号: row.id, 当前状态: row.status }
+    for (const column of columns) {
+      record[column] = row[column] ?? ''
+    }
+    return record
+  })
+  return {
+    filename: `${meta.name}${filenameSuffix}-清单.csv`,
+    content: stringifyCsv(headers, records),
   }
-  return { filename: `${meta.name}-清单.csv`, content: `\uFEFF${lines.join('\n')}` }
 }
 
-export function downloadEntries(key: string): void {
-  const { filename, content } = exportEntries(key)
+export function exportEntries(
+  key: string,
+  rows?: EntryRow[],
+  columns?: string[],
+  filenameSuffix = '',
+): { filename: string; content: string } {
+  const meta = moduleMeta(key)
+  return exportRows(
+    key,
+    rows ?? listRows(key),
+    columns ?? meta.fields,
+    filenameSuffix,
+  )
+}
+
+export function downloadFile(filename: string, content: string): void {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
@@ -82,6 +109,11 @@ export function downloadEntries(key: string): void {
   anchor.click()
   document.body.removeChild(anchor)
   URL.revokeObjectURL(url)
+}
+
+export function downloadEntries(key: string): void {
+  const { filename, content } = exportEntries(key)
+  downloadFile(filename, content)
 }
 
 export function loadOverview(): OverviewResult {
